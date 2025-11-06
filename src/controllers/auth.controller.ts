@@ -1,72 +1,61 @@
 import {Request, Response} from 'express'
 import bcrypt from 'bcryptjs'
-import { User } from '../model/user.model'
+import { IUser, Role, Status, User } from '../models/user.model'
 import { signAccessToken } from '../utils/tokens'
+import { AuthRequest } from "../middlewares/auth.middlewares";
 
 // /api/v1/auth/register
 export const register = async(req: Request, res: Response) => {
     // res.status(201).json({ message: 'User registered successfully' })
 
     try {
-        const firstname = req.body.firstname;
-        const lastname = req.body.lastname;
-        const email = req.body.email;
-        const password = req.body.password;
-        const role = req.body.roles;
-        const approved = req.body.approved;
+    const { firstname, lastname, email, password, role } = req.body
 
-        if (!firstname || !lastname || !email || !password || !role) {
-            return res.status(400).json({
-                message: "All fields are required."
-            });
-        } 
-
-        if ( role !== 'AUTHOR' && role !== 'USER' ) {
-            return res.status(400).json({
-                message: "Invalid role specified."
-            });
-        }
-
-        const exUser = await User.findOne({ email: email })
-        if (exUser) {
-            return res.status(400).json({
-                message: "Email already exists."
-            });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        const newUser = new User({
-            firstname: firstname,
-            lastname: lastname,
-            email: email,
-            password: hashedPassword,
-            roles: [role],
-            approved: approved
-        })
-
-        const savedUser = await newUser.save(); 
-
-        console.log("User Data : ", { firstname, lastname, email, password, role, approved });
-
-        res.status(201).json({
-            message: 
-                role === 'AUTHOR' ? 'Author registered successfully' :
-                'User registered successfully',
-            data: { 
-                id: savedUser._id,
-                email: savedUser.email,
-                roles: savedUser.roles,
-                approved: savedUser.approved
-            }
-        })
-    } catch (error) {
-        console.error('Error saving user:', error);
-        res.status(500).json({
-             message: "Error while saving user"
-        });
-        return; 
+    // data validation
+    if (!firstname || !lastname || !email || !password || !role) {
+      return res.status(400).json({ message: "All fields are required" })
     }
+
+    if (role !== Role.USER && role !== Role.AUTHOR) {
+      return res.status(400).json({ message: "Invalid role" })
+    }
+
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ message: "Email alrady registered" })
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const approvalStatus =
+      role === Role.AUTHOR ? Status.PENDING : Status.APPROVED
+
+    const newUser = new User({
+      firstname, // firstname: firstname
+      lastname,
+      email,
+      password: hashedPassword,
+      roles: [role],
+      approved: approvalStatus
+    })
+
+    await newUser.save()
+
+    res.status(201).json({
+      message:
+        role === role.AUTHOR
+          ? "Author registered successfully. waiting for approvel"
+          : "User registered successfully",
+      data: {
+        id: newUser._id,
+        email: newUser.email,
+        roles: newUser.roles,
+        approved: newUser.approved
+      }
+    })
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message })
+  }
 }
 
 // /api/v1/auth/login
@@ -74,52 +63,97 @@ export const login = async (req: Request, res: Response) => {
     // res.status(200).json({ message: 'User logged in successfully' })
 
     try {
-        const { email, password } = req.body;
+    const { email, password } = req.body
 
-        if (!email || !password) {
-            return res.status(400).json({
-                message: "Email and password are required."
-            });
-        }
-        const existingUser = await User.findOne({ email: email });
-        if (!existingUser) {
-            return res.status(401).json({
-                message: "Invalid credentials."
-            });
-        }
-        const valid = await bcrypt.compare(password, existingUser.password);
-        if (!valid) {
-            return res.status(401).json({
-                message: "Invalid credentials."
-            });
-        }   
+    const existingUser = await User.findOne({ email })
+    if (!existingUser) {
+      return res.status(401).json({ message: "Invalid credentials" })
+    }
 
-        // generate JWT token
-        const accessToken = signAccessToken(existingUser);
-        
-        res.status(200).json({
-            message: "Login successful",
-            data: { 
-                email: existingUser.email,
-                roles: existingUser.roles,
-                accessToken
-            }
-        });
-    } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({
-             message: "Error during login"
-        });
-        return; 
-    }   
+    const valid = await bcrypt.compare(password, existingUser.password)
+    if (!valid) {
+      return res.status(401).json({ message: "Invalid credentials" })
+    }
+
+    const accessToken = signAccessToken(existingUser)
+
+    res.status(200).json({
+      message: "success",
+      data: {
+        email: existingUser.email,
+        roles: existingUser.roles,
+        accessToken
+      }
+    })
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message })
+  }
 }
 
 // /api/v1/auth/me
-export const getMe = (req: Request, res: Response) => {
-    res.status(200).json({ message: 'User information retrieved successfully' })
+export const getMe = async (req: AuthRequest, res: Response) => {
+     // const roles = req.user.roles
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" })
+  }
+  const userId = req.user.sub
+  const user =
+    ((await User.findById(userId).select("-password")) as IUser) || null
+
+  if (!user) {
+    return res.status(404).json({
+      message: "User not found"
+    })
+  }
+
+  const { firstname, lastname, email, roles, approved } = user
+
+  res.status(200).json({
+    message: "Ok",
+    data: { firstname, lastname, email, roles, approved }
+  })
 }
 
 // /api/v1/auth/admin/register
-export const registerAdmin = (req: Request, res: Response) => {
-    res.status(201).json({ message: 'Admin registered successfully' })
+export const registerAdmin = async (req: Request, res: Response) => {
+    // res.status(201).json({ message: 'Admin registered successfully' })
+
+    try {
+    const { firstname, lastname, email, password} = req.body
+
+    // data validation
+    if (!firstname || !lastname || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" })
+    }
+
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ message: "Email alrady registered" })
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const newUser = new User({
+      firstname, // firstname: firstname
+      lastname,
+      email,
+      password: hashedPassword,
+      roles: [Role.ADMIN],
+      approved: Status.APPROVED
+    })
+
+    await newUser.save()
+
+    res.status(201).json({
+      message: "Admin registered successfully",
+      data: {
+        id: newUser._id,
+        email: newUser.email,
+        roles: newUser.roles,
+        approved: newUser.approved
+      }
+    })
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message })
+  }
 }

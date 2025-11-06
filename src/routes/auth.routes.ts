@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { register, login, getMe, registerAdmin } from '../controllers/auth.controller'
 import { authenticate } from '../middlewares/auth.middlewares'
+import { isAdmin } from '../middlewares/isAdmin.middleware'
 
 const router = Router()
 
@@ -18,6 +19,6 @@ router.get('/me', authenticate, getMe)
 
 // /api/v1/auth/admin/register
 // protected route (ADMIN)
-router.post('/admin/register', authenticate, registerAdmin)
+router.post('/admin/register', authenticate, isAdmin, registerAdmin)
 
 export default router
