@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { register, login, getMe, registerAdmin } from '../controllers/auth.controller'
+import { register, login, getMe, registerAdmin, refreshToken } from '../controllers/auth.controller'
 import { authenticate } from '../middlewares/auth.middleware'
 import { requireRole } from "../middlewares/role.middleware"
 import { Role } from "../models/user.model"
@@ -23,5 +23,6 @@ router.get('/me', authenticate, getMe)
 router.post('/admin/register', authenticate, requireRole([Role.ADMIN]), registerAdmin)
 
 // Refresh token end point
+router.post('/refresh', refreshToken)
 
 export default router

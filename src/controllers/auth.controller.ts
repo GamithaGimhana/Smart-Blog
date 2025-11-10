@@ -1,8 +1,13 @@
 import {Request, Response} from 'express'
 import bcrypt from 'bcryptjs'
 import { IUser, Role, Status, User } from '../models/user.model'
-import { signAccessToken } from '../utils/tokens'
+import { signAccessToken, signRefreshToken } from '../utils/tokens'
 import { AuthRequest } from "../middlewares/auth.middleware";
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
 
 // /api/v1/auth/register
 export const register = async(req: Request, res: Response) => {
@@ -157,3 +162,32 @@ export const registerAdmin = async (req: Request, res: Response) => {
     res.status(500).json({ message: err?.message })
   }
 }
+
+export const refreshToken = async (req: Request, res: Response) => {
+  const token = req.cookies.refreshToken;
+
+  if (!token) {
+    return res.status(401).json({ message: 'No refresh token found.!' });
+  }
+
+  try {
+    const payload: any = jwt.verify(token, JWT_REFRESH_SECRET);
+
+    const userId = payload.sub;
+
+    const existingUser = await User.findById(userId);
+
+    if (!existingUser) {
+      return res.status(401).json({
+        message: 'Invalid or expired refresh token.!',
+        existingUser: existingUser,
+      });
+    }
+    const newAccessToken = signAccessToken(existingUser);
+    res.json({ accessToken: newAccessToken });
+  } catch (err) {
+    return res
+      .status(403)
+      .json({ message: 'Invalid or expired refresh token.!', error: err });
+  }
+};

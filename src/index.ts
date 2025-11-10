@@ -3,6 +3,7 @@ import cors from 'cors'
 import authRoutes from './routes/auth.routes'  
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
+import postRoutes from './routes/post.routes'
 dotenv.config()
 
 const SERVER_PORT = process.env.SERVER_PORT
@@ -23,6 +24,7 @@ app.use(
 
 // Mount auth routes, mekath middleware ekak
 app.use('/api/v1/auth', authRoutes)     
+app.use('/api/v1/post', postRoutes)
 
 mongoose
   .connect(MONGO_URI)
