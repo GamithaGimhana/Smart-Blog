@@ -20,7 +20,7 @@ app.use(express.json())
 // CORS middleware configuration
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'https://smart-blog-fe-nine.vercel.app'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 )
