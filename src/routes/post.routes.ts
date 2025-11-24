@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../middlewares/auth.middleware'
 import { savePost, getAllPost, getMyPost } from '../controllers/post.controller'
+import { generateContent } from '../controllers/ai.controller'
 import { requireRole } from '../middlewares/role.middleware'
 import { Role } from '../models/user.model'
 import { upload } from '../middlewares/upload.middleware'
@@ -19,5 +20,9 @@ router.get('/', getAllPost)
 // /api/v1/post/me
 // protected route (AUTHOR, ADMIN)
 router.get('/me', authenticate, requireRole([ Role.ADMIN, Role.AUTHOR ]), getMyPost)
+
+// /api/v1/post/ai/generate
+// protected route (AUTHOR, ADMIN)
+router.post('/ai/generate', generateContent)
 
 export default router
