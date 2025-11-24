@@ -28,6 +28,9 @@ app.use(
 // Mount auth routes, mekath middleware ekak
 app.use('/api/v1/auth', authRoutes)     
 app.use('/api/v1/post', postRoutes)
+app.get("/", (req, res) => {
+  res.send("Backend is running...")
+})
 
 mongoose
   .connect(MONGO_URI)
